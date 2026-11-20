@@ -17,6 +17,7 @@ export const getWalletChallenge = createServerFn({ method: "POST" })
     const { authenticateTelegram } = await import("./server/session.ts");
     const auth = authenticateTelegram(data.initData, process.env);
     if (!auth.ok) return { ok: false, status: auth.status, error: auth.error };
+    if (process.env.TON_PROOF_ENABLED?.trim() !== "true") return { ok: false, status: 503, error: "wallet-verification-disabled" };
     const secret = process.env.MEMO_SECRET?.trim();
     if (!secret || secret.length < 24) return { ok: false, status: 500, error: "server-misconfigured:MEMO_SECRET" };
     const { makeChallenge } = await import("./server/ton-proof.ts");
