@@ -10,6 +10,7 @@ import { toRawAddress } from "./ton-address.ts";
 export const CHALLENGE_TTL_MS = 10 * 60_000;
 export const PROOF_MAX_AGE_MS = 15 * 60_000;
 export const MAINNET_CHAIN = "-239";
+export const TESTNET_CHAIN = "-3";
 
 const sha256 = (b: Buffer | Uint8Array) => createHash("sha256").update(b).digest();
 const SPKI_ED25519 = Buffer.from("302a300506032b6570032100", "hex");
@@ -53,9 +54,10 @@ export function verifyTonProof(i: {
   tgId: number;
   secret: string;
   now?: number;
+  expectedChain?: string;
 }): ProofResult {
   const now = i.now ?? Date.now();
-  if (i.chain !== MAINNET_CHAIN) return { ok: false, reason: "chain" };
+  if (i.chain !== (i.expectedChain ?? MAINNET_CHAIN)) return { ok: false, reason: "chain" };
   const raw = toRawAddress(i.address);
   const m = raw ? /^(-1|0):([0-9a-f]{64})$/.exec(raw) : null;
   if (!m) return { ok: false, reason: "address" };
