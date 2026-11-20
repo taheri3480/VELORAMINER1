@@ -47,11 +47,14 @@ export const verifyWallet = createServerFn({ method: "POST" })
     const secret = process.env.MEMO_SECRET?.trim();
     const key = process.env.TONAPI_KEY?.trim();
     const domain = process.env.APP_DOMAIN?.trim();
+    const network = (process.env.TON_NETWORK?.trim() || "mainnet").toLowerCase();
+    const expectedChain = network === "testnet" ? "-3" : network === "mainnet" ? "-239" : null;
     // Feature flag: stays off until the proof verifier has been tested with a real wallet.
     if (process.env.TON_PROOF_ENABLED?.trim() !== "true") return { ok: false, status: 503, error: "wallet-verification-disabled" };
     if (!secret || secret.length < 24) return { ok: false, status: 500, error: "server-misconfigured:MEMO_SECRET" };
     if (!key) return { ok: false, status: 500, error: "server-misconfigured:TONAPI_KEY" };
     if (!domain) return { ok: false, status: 500, error: "server-misconfigured:APP_DOMAIN" };
+    if (!expectedChain) return { ok: false, status: 500, error: "server-misconfigured:TON_NETWORK" };
 
     const { toRawAddress } = await import("./server/ton-address.ts");
     const { fetchPublicKey } = await import("./server/tonapi.ts");
@@ -60,13 +63,13 @@ export const verifyWallet = createServerFn({ method: "POST" })
     if (!raw) return { ok: false, status: 400, error: "bad-address" };
     let trusted: string | null;
     try {
-      trusted = await fetchPublicKey(key, raw);
+      trusted = await fetchPublicKey(key, raw, undefined, network as "mainnet" | "testnet");
     } catch {
       return { ok: false, status: 502, error: "chain-lookup-failed" };
     }
     const r = verifyTonProof({
       address: raw, chain: data.chain, publicKeyHex: data.publicKey, trustedPublicKeyHex: trusted,
-      proof: data.proof, expectedDomain: domain, tgId: auth.user.id, secret,
+      proof: data.proof, expectedDomain: domain, tgId: auth.user.id, secret, expectedChain,
     });
     if (!r.ok) return { ok: false, status: 401, error: `proof-rejected:${r.reason}` };
 
