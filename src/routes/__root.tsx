@@ -13,7 +13,10 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       { name: "theme-color", content: "#07060c" },
     ],
-    scripts: [{ src: "https://telegram.org/js/telegram-web-app.js" }],
+    scripts: [
+      { src: "https://telegram.org/js/telegram-web-app.js" },
+      { src: "https://unpkg.com/@tonconnect/ui@5.0.3/dist/tonconnect-ui.min.js" },
+    ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
