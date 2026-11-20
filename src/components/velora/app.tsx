@@ -115,7 +115,7 @@ function getTonConnectUI(): TonConnectUIInstance | null {
   return tonConnectUIInstance;
 }
 
-type Screen = "home" | "swap" | "friends" | "wallet" | "stake" | "tasks" | "rules";
+type Screen = "home" | "swap" | "friends" | "wallet" | "stake" | "tasks" | "rules" | "admin";
 type Sheet = null | "menu" | "leagues" | "connect" | "activate" | "bell" | "sell" | "reset";
 
 type Nav = {
@@ -263,6 +263,7 @@ export function VeloraApp() {
   const toast = useVelora((s) => s.toast);
   const toastAt = useVelora((s) => s.toastAt);
   const banned = useVelora((s) => s.banned);
+  const session = useSession();
   const [screen, setScreen] = useState<Screen>("home");
   const [sheet, setSheet] = useState<Sheet>(null);
   const [sellAmount, setSellAmount] = useState(0);
@@ -364,6 +365,7 @@ export function VeloraApp() {
               {screen === "stake" && <StakeScreen />}
               {screen === "tasks" && <TasksScreen />}
               {screen === "rules" && <RulesScreen />}
+              {screen === "admin" && session.status === "authed" && session.isAdmin && <AdminScreen />}
             </main>
             <TabBar />
             {toast && (
@@ -1222,6 +1224,114 @@ function WalletScreen() {
   );
 }
 
+function AdminScreen() {
+  const [rows, setRows] = useState<WithdrawalRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [txHashes, setTxHashes] = useState<Record<string, string>>({});
+
+  async function refresh() {
+    const initData = window.Telegram?.WebApp?.initData ?? "";
+    if (!initData) { setError("Open this panel inside the Telegram Mini App."); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const result = await adminListWithdrawals({ data: { initData } });
+      if (!result.ok) setError(result.error);
+      else setRows(result.withdrawals);
+    } catch {
+      setError("Could not load withdrawal requests.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void refresh(); }, []);
+
+  async function review(id: string, action: "approve" | "reject" | "complete") {
+    const initData = window.Telegram?.WebApp?.initData ?? "";
+    if (!initData || busyId) return;
+    setBusyId(id);
+    setError("");
+    try {
+      const result = await adminReviewWithdrawal({
+        data: { initData, id, action, txHash: action === "complete" ? txHashes[id] ?? "" : "" },
+      });
+      if (!result.ok) setError(result.error);
+      else await refresh();
+    } catch {
+      setError("The action could not be completed.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold tracking-wide text-gold">ADMIN ONLY</p>
+          <h2 className="font-display text-2xl font-extrabold">Withdrawal review</h2>
+        </div>
+        <button type="button" onClick={() => void refresh()} disabled={loading} className="h-10 rounded-full border border-line px-3 text-xs font-bold disabled:opacity-50">
+          {loading ? "Loading…" : "Refresh"}
+        </button>
+      </div>
+      <p className="rounded-2xl border border-line bg-card p-3 text-xs leading-relaxed text-muted">
+        Approval does not send tokens automatically. After approving, send the transfer manually from the treasury wallet, then enter its transaction hash and mark it paid.
+      </p>
+      {error && <p role="alert" className="rounded-2xl border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+      {!loading && rows.length === 0 && <p className="rounded-2xl border border-line bg-card p-4 text-sm text-muted">No pending withdrawal requests.</p>}
+      {rows.map((w) => {
+        const gross = w.amountMicroVlr / 1_000_000;
+        const fee = w.feeMicroVlr / 1_000_000;
+        const net = gross - fee;
+        return (
+          <article key={w.id} className="rounded-3xl border border-line bg-card p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-dim">{w.id}</p>
+              <span className={cn("rounded-full px-2 py-1 text-xs font-bold", w.status === "approved" ? "bg-mint/15 text-mint" : "bg-gold/15 text-gold")}>{w.status}</span>
+            </div>
+            <p className="mt-3 text-xl font-extrabold tabular-nums">{fmtTrim(gross, 2)} VLR</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <p className="text-muted">Telegram ID: <b className="text-fg">{w.telegramId}</b></p>
+              <p className="text-muted">Fee: <b className="text-fg">{fmtTrim(fee, 2)} VLR</b></p>
+              <p className="text-muted">Net: <b className="text-mint">{fmtTrim(net, 2)} VLR</b></p>
+              <p className="text-muted">Created: <b className="text-fg">{new Date(w.createdAt).toLocaleString()}</b></p>
+            </div>
+            <div className="mt-3 rounded-2xl bg-card-2 p-3">
+              <p className="text-xs font-bold">On-chain 25% hold check</p>
+              {w.walletBalanceVlr === null ? (
+                <p className="mt-1 text-xs text-danger">Balance unavailable — approval is blocked until it can be verified.</p>
+              ) : (
+                <p className={cn("mt-1 text-sm font-extrabold", w.holdMet ? "text-mint" : "text-danger")}>
+                  {w.holdMet ? "PASS" : "NOT ENOUGH"} · {fmtTrim(w.walletBalanceVlr, 2)} / {fmtTrim(w.holdRequiredVlr, 2)} VLR
+                </p>
+              )}
+            </div>
+            <p className="mt-3 break-all text-xs text-dim">Wallet: {w.wallet}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {w.status === "pending" && (
+                <>
+                  <button type="button" onClick={() => void review(w.id, "approve")} disabled={busyId === w.id || w.holdMet !== true} className="h-11 rounded-full bg-mint px-3 text-sm font-extrabold text-bg disabled:opacity-40">Approve</button>
+                  <button type="button" onClick={() => void review(w.id, "reject")} disabled={busyId === w.id} className="h-11 rounded-full border border-danger/40 text-sm font-bold text-danger disabled:opacity-40">Reject & refund</button>
+                </>
+              )}
+            </div>
+            {w.status === "approved" && (
+              <div className="mt-3 flex flex-col gap-2">
+                <Field value={txHashes[w.id] ?? ""} onChange={(e) => setTxHashes((old) => ({ ...old, [w.id]: e.target.value }))} placeholder="TON transaction hash" />
+                <GoldButton disabled={busyId === w.id || (txHashes[w.id] ?? "").length < 20} onClick={() => void review(w.id, "complete")}>Mark as paid</GoldButton>
+              </div>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 function RulesScreen() {
   const { tr } = useT();
   const lines: { icon: ReactNode; text: string }[] = [
@@ -1328,6 +1438,8 @@ function Sheets() {
   const { tr, tf } = useT();
   const { sheet, close, open, setScreen, sellAmount } = useNav();
   const s = useVelora();
+  const session = useSession();
+  const isAdmin = session.status === "authed" && session.isAdmin;
   if (sheet === "menu") {
     return (
       <Sheet title={tr("services")} onClose={close}>
@@ -1337,6 +1449,7 @@ function Sheets() {
           <MenuTile icon={<Check size={18} />} title={tr("tasks")} body={tr("tasksHint")} onClick={() => setScreen("tasks")} />
           <MenuTile icon={<Trophy size={18} />} title={tr("leagues")} body={tr("leagueHint")} onClick={() => open("leagues")} />
           <MenuTile icon={<BookOpen size={18} />} title={tr("rules")} body={tr("rulesLead")} onClick={() => setScreen("rules")} />
+          {isAdmin && <MenuTile icon={<Shield size={18} />} title="Admin withdrawals" body="Review requests and check the on-chain 25% hold" onClick={() => setScreen("admin")} tone="gold" />}
         </div>
         <p className="mt-4 text-xs font-bold tracking-wide text-dim">{tr("preview")}</p>
         <div className="mt-2 grid gap-2">
