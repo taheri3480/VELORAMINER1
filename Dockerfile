@@ -2,6 +2,8 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 ENV NITRO_PRESET=node-server
 ENV VITE_GROK_EXTENSIONS=0
+ARG VITE_TON_NETWORK=testnet
+ENV VITE_TON_NETWORK=$VITE_TON_NETWORK
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
