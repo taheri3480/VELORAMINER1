@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type InputHTMLAttributes,
   type ReactNode,
@@ -1307,6 +1308,7 @@ function TonConnectAction({ label, onConnected }: { label: string; onConnected: 
       });
       ui.setConnectRequestParameters({ state: "ready", value: { tonProof: challenge.payload } });
       await ui.openModal();
+      if (!processing.current) setBusy(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Wallet connection failed.");
       getTonConnectUI()?.setConnectRequestParameters(null);
