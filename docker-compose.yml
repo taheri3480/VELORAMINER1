@@ -27,7 +27,7 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       VITE_GROK_EXTENSIONS: "0"
-      TON_PROOF_ENABLED: ${TON_PROOF_ENABLED:-false}
+      TON_PROOF_ENABLED: "${TON_PROOF_ENABLED:-false}"
     depends_on:
       db:
         condition: service_healthy
