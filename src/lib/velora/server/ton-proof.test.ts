@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { makeChallenge, checkChallenge, verifyTonProof, MAINNET_CHAIN, type TonProof } from "./ton-proof.ts";
+import { makeChallenge, checkChallenge, verifyTonProof, MAINNET_CHAIN, TESTNET_CHAIN, type TonProof } from "./ton-proof.ts";
 import { parsePublicKey } from "./tonapi.ts";
 
 const S = "unit-test-secret-unit-test-secret";
@@ -43,6 +43,11 @@ describe("verifyTonProof", () => {
   it("accepts a correctly signed proof and returns the raw wallet", () => {
     const r = verifyTonProof(base(makeProof()));
     assert.deepEqual(r, { ok: true, walletRaw: ADDR });
+  });
+  it("accepts a correctly signed testnet proof only when testnet is explicitly selected", () => {
+    const p = makeProof();
+    assert.equal((verifyTonProof({ ...base(p), chain: TESTNET_CHAIN }) as { reason: string }).reason, "chain");
+    assert.deepEqual(verifyTonProof({ ...base(p), chain: TESTNET_CHAIN, expectedChain: TESTNET_CHAIN }), { ok: true, walletRaw: ADDR });
   });
   it("rejects wrong chain, domain, user, stale/future timestamp", () => {
     const p = makeProof();
