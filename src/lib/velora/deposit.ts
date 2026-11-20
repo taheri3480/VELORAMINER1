@@ -18,6 +18,8 @@ const validate = (data: unknown) => {
 export const getDepositInfo = createServerFn({ method: "POST" })
   .validator(validate)
   .handler(async ({ data }): Promise<DepositInfo> => {
+    const { isDepositEnabled } = await import("./server/env.ts");
+    if (!isDepositEnabled(process.env)) return { ok: false, status: 503, error: "deposits-disabled" };
     const { authenticateTelegram } = await import("./server/session.ts");
     const auth = authenticateTelegram(data.initData, process.env);
     if (!auth.ok) return { ok: false, status: auth.status, error: auth.error };
@@ -39,6 +41,8 @@ const COOLDOWN_MS = 5_000;
 export const checkDeposits = createServerFn({ method: "POST" })
   .validator(validate)
   .handler(async ({ data }): Promise<CheckResult> => {
+    const { isDepositEnabled } = await import("./server/env.ts");
+    if (!isDepositEnabled(process.env)) return { ok: false, status: 503, error: "deposits-disabled" };
     const { authenticateTelegram } = await import("./server/session.ts");
     const auth = authenticateTelegram(data.initData, process.env);
     if (!auth.ok) return { ok: false, status: auth.status, error: auth.error };
