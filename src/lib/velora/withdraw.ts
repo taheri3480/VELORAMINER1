@@ -11,6 +11,7 @@ export type WithdrawResult =
 export type WithdrawalRow = {
   id: string; telegramId: string; amountMicroVlr: number; feeMicroVlr: number;
   wallet: string; status: string; createdAt: string;
+  walletBalanceVlr: number | null; holdRequiredVlr: number; holdMet: boolean | null;
 };
 export type AdminListResult = { ok: true; withdrawals: WithdrawalRow[] } | { ok: false; status: number; error: string };
 export type AdminReviewResult =
@@ -69,6 +70,13 @@ export const requestWithdrawal = createServerFn({ method: "POST" })
       );
       const r = rows[0];
       if (!r) return { ok: false, status: 500, error: "internal-error" };
+      if (!r.duplicate) {
+        const { notifyAdmins } = await import("./server/telegram-notify.ts");
+        await notifyAdmins(
+          `New VELORA withdrawal request\\nUser: ${id}\\nAmount: ${data.amountMicroVlr / 1_000_000} VLR\\nFee: ${plan.fee / 1_000_000} VLR\\nNet: ${plan.net / 1_000_000} VLR\\nRequest: ${r.withdrawal_id}`,
+          process.env,
+        );
+      }
       return { ok: true, withdrawalId: r.withdrawal_id, balanceMicroVlr: Number(r.balance_micro_vlr), feeMicroVlr: plan.fee, netMicroVlr: plan.net, duplicate: r.duplicate, status: "pending_manual_review" };
     } catch (e) {
       const code = mapDbError(e);
@@ -84,10 +92,31 @@ export const adminListWithdrawals = createServerFn({ method: "POST" })
     if (!auth.ok) return { ok: false, status: auth.status, error: auth.error };
     if (!auth.isAdmin) return { ok: false, status: 403, error: "forbidden" };
     const { getSql } = await import("@/lib/db");
-    const rows = await (await getSql()).query<{ id: string; telegram_id: string; amount_micro_vlr: string | number; fee_micro_vlr: string | number; destination_address: string; status: string; created_at: string }>(
-      "SELECT id, telegram_id, amount_micro_vlr, fee_micro_vlr, destination_address, status, created_at FROM velora_withdrawals WHERE status IN ('pending','approved') ORDER BY created_at LIMIT 100",
+    const sql = await getSql();
+    const rows = await sql.query<{ id: string; telegram_id: string; amount_micro_vlr: string | number; fee_micro_vlr: string | number; destination_address: string; status: string; created_at: string; wallet_address: string | null }>(
+      `SELECT w.id, w.telegram_id, w.amount_micro_vlr, w.fee_micro_vlr, w.destination_address, w.status, w.created_at, u.wallet_address
+       FROM velora_withdrawals w LEFT JOIN velora_users u ON u.telegram_id = w.telegram_id
+       WHERE w.status IN ('pending','approved') ORDER BY w.created_at LIMIT 30`,
     );
-    return { ok: true, withdrawals: rows.map((r) => ({ id: r.id, telegramId: r.telegram_id, amountMicroVlr: Number(r.amount_micro_vlr), feeMicroVlr: Number(r.fee_micro_vlr), wallet: r.destination_address, status: r.status, createdAt: String(r.created_at) })) };
+    const key = process.env.TONAPI_KEY?.trim();
+    const { VLR_JETTON_MASTER } = await import("./server/env.ts");
+    const { fetchJettonWallet } = await import("./server/tonapi.ts");
+    const withdrawals = await Promise.all(rows.map(async (r) => {
+      const amount = Number(r.amount_micro_vlr) / 1_000_000;
+      let walletBalanceVlr: number | null = null;
+      if (key && r.wallet_address) {
+        try { walletBalanceVlr = (await fetchJettonWallet(key, r.wallet_address, VLR_JETTON_MASTER)).balance; }
+        catch { walletBalanceVlr = null; }
+      }
+      const holdRequiredVlr = amount * 0.25;
+      return {
+        id: r.id, telegramId: r.telegram_id, amountMicroVlr: Number(r.amount_micro_vlr),
+        feeMicroVlr: Number(r.fee_micro_vlr), wallet: r.destination_address,
+        status: r.status, createdAt: String(r.created_at), walletBalanceVlr,
+        holdRequiredVlr, holdMet: walletBalanceVlr === null ? null : walletBalanceVlr + 1e-9 >= holdRequiredVlr,
+      };
+    }));
+    return { ok: true, withdrawals };
   });
 
 export const adminReviewWithdrawal = createServerFn({ method: "POST" })
@@ -117,10 +146,23 @@ export const adminReviewWithdrawal = createServerFn({ method: "POST" })
       sql.query("SELECT * FROM velora_resolve_withdrawal($1, $2, $3, $4, $5, $6)", [data.id, action, admin, note, tx, ban]);
 
     try {
-      if (data.action === "reject") { await resolve("reject", data.note, null); return { ok: true, outcome: "rejected" }; }
+      if (data.action === "reject") {
+        const target = (await sql.query<{ telegram_id: string }>("SELECT telegram_id FROM velora_withdrawals WHERE id = $1", [data.id]))[0]?.telegram_id;
+        await resolve("reject", data.note, null);
+        if (target) {
+          const { sendTelegramMessage } = await import("./server/telegram-notify.ts");
+          await sendTelegramMessage(target, "Your VELORA withdrawal request was rejected. The requested amount has been returned to your account.", process.env);
+        }
+        return { ok: true, outcome: "rejected" };
+      }
       if (data.action === "complete") {
         if (!data.txHash) return { ok: false, status: 400, error: "tx-hash-required" };
+        const target = (await sql.query<{ telegram_id: string }>("SELECT telegram_id FROM velora_withdrawals WHERE id = $1", [data.id]))[0]?.telegram_id;
         await resolve("complete", data.note, data.txHash);
+        if (target) {
+          const { sendTelegramMessage } = await import("./server/telegram-notify.ts");
+          await sendTelegramMessage(target, `Your VELORA withdrawal has been marked as paid. Transaction: ${data.txHash}`, process.env);
+        }
         return { ok: true, outcome: "completed" };
       }
 
@@ -156,10 +198,17 @@ export const adminReviewWithdrawal = createServerFn({ method: "POST" })
         { ...DEFAULT_CONFIG, ignoreOut: [toRawAddress(TREASURY_ADDRESS)!] },
       );
       const d = decideWithdrawal({ createdAt, now, gross: Number(w.amount_micro_vlr) / MICRO, walletVlrBalance: balance, banned: !!w.banned_at, guard });
-      if (d.action === "ready") { await resolve("approve", data.note, null); return { ok: true, outcome: "approved" }; }
+      if (d.action === "ready") {
+        await resolve("approve", data.note, null);
+        const { sendTelegramMessage } = await import("./server/telegram-notify.ts");
+        await sendTelegramMessage(w.telegram_id, "Your VELORA withdrawal request has been approved. The administrator will send the payment manually.", process.env);
+        return { ok: true, outcome: "approved" };
+      }
       if (d.action === "wait") return { ok: false, status: 409, error: "wait-indexing-buffer" };
       if (d.action === "forfeit") {
         await resolve("forfeit", d.reason, null, true);
+        const { sendTelegramMessage } = await import("./server/telegram-notify.ts");
+        await sendTelegramMessage(w.telegram_id, "Your VELORA withdrawal was forfeited after the on-chain activity review. Contact support if you believe this is an error.", process.env);
         return { ok: true, outcome: "forfeited", reason: d.reason };
       }
       return { ok: false, status: 409, error: d.reason }; // banned / hold-not-met: admin decides (reject = refund)
