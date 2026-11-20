@@ -15,7 +15,10 @@ services:
       retries: 20
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_TON_NETWORK: ${VITE_TON_NETWORK:-testnet}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -24,7 +27,7 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       VITE_GROK_EXTENSIONS: "0"
-      TON_PROOF_ENABLED: "false"
+      TON_PROOF_ENABLED: ${TON_PROOF_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy
