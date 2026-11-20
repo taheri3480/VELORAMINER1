@@ -50,6 +50,10 @@ jobs:
             }
           }
           NODE
+      - name: Enforce dependency security thresholds
+        run: |
+          npm audit --omit=dev --audit-level=moderate
+          npm audit --audit-level=high
       - name: Start dev server for auth invariant
         run: |
           npm run dev > /tmp/velora-dev.log 2>&1 &
