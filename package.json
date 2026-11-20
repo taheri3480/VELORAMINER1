@@ -20,7 +20,7 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/preview-path-prefix.test.ts src/lib/velora/server/server.test.ts src/lib/velora/server/phase2.test.ts src/lib/velora/server/admin.test.ts src/lib/velora/server/session.test.ts src/lib/velora/server/tonapi.test.ts src/lib/velora/server/ton-proof.test.ts src/lib/velora/server/payout.test.ts src/lib/velora/server/payout-run.test.ts src/lib/velora/server/withdraw-rules.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/preview-path-prefix.test.ts src/lib/velora/server/server.test.ts src/lib/velora/server/phase2.test.ts src/lib/velora/server/admin.test.ts src/lib/velora/server/env.test.ts src/lib/velora/server/session.test.ts src/lib/velora/server/tonapi.test.ts src/lib/velora/server/ton-proof.test.ts src/lib/velora/server/payout.test.ts src/lib/velora/server/payout-run.test.ts src/lib/velora/server/withdraw-rules.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "gen:hot-wallet": "node scripts/gen-hot-wallet.mjs",
