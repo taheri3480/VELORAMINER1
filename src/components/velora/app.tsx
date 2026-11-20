@@ -77,6 +77,42 @@ import { useVelora } from "@/lib/velora/store";
 import markUrl from "@/assets/velora-mark.png";
 import { useSession } from "@/lib/velora/session";
 import { signInWithTelegram } from "@/lib/velora/login-client";
+import { getWalletChallenge, verifyWallet } from "@/lib/velora/wallet";
+
+
+type TonProofPayload = {
+  timestamp: number;
+  domain: { lengthBytes: number; value: string };
+  payload: string;
+  signature: string;
+};
+type TonWalletInfo = {
+  account: { address: string; chain: string; publicKey: string };
+  connectItems?: { tonProof?: { proof: TonProofPayload } | { error: { code: number; message: string } } };
+};
+type TonConnectUIInstance = {
+  wallet: TonWalletInfo | null;
+  setConnectionNetwork(network?: string): void;
+  setConnectRequestParameters(value: null | { state: "loading" } | { state: "ready"; value: { tonProof: string } }): void;
+  openModal(): Promise<unknown>;
+  disconnect(): Promise<void>;
+  onStatusChange(callback: (wallet: TonWalletInfo | null) => void): () => void;
+};
+declare global {
+  interface Window {
+    TON_CONNECT_UI?: { TonConnectUI: new (options: { manifestUrl: string }) => TonConnectUIInstance };
+  }
+}
+let tonConnectUIInstance: TonConnectUIInstance | null = null;
+function getTonConnectUI(): TonConnectUIInstance | null {
+  if (typeof window === "undefined" || !window.TON_CONNECT_UI?.TonConnectUI) return null;
+  if (!tonConnectUIInstance) {
+    tonConnectUIInstance = new window.TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: new URL("/tonconnect-manifest.json", window.location.origin).toString(),
+    });
+  }
+  return tonConnectUIInstance;
+}
 
 type Screen = "home" | "swap" | "friends" | "wallet" | "stake" | "tasks" | "rules";
 type Sheet = null | "menu" | "leagues" | "connect" | "activate" | "bell" | "sell" | "reset";
@@ -1070,7 +1106,7 @@ function WalletScreen() {
             </p>
             <p className="mt-2 text-xs break-all text-muted">{s.address}</p>
             <p className="mt-2 text-sm font-bold">{fmtTrim(s.gram, 2)} GRAM</p>
-            <button type="button" onClick={() => s.disconnect()} className="mt-3 inline-flex h-10 items-center gap-2 rounded-full border border-line px-3 text-sm font-bold">
+            <button type="button" onClick={async () => { try { await getTonConnectUI()?.disconnect(); } finally { s.disconnect(); } }} className="mt-3 inline-flex h-10 items-center gap-2 rounded-full border border-line px-3 text-sm font-bold">
               <Unlink size={14} />
               {tr("disconnect")}
             </button>
@@ -1218,6 +1254,74 @@ function BanIcon() {
   return <AlertTriangle size={16} />;
 }
 
+
+function TonConnectAction({ label, onConnected }: { label: string; onConnected: (address: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const unsubscribe = useRef<(() => void) | null>(null);
+  const processing = useRef(false);
+
+  useEffect(() => () => { unsubscribe.current?.(); }, []);
+
+  const connect = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const initData = window.Telegram?.WebApp?.initData ?? "";
+      if (!initData) throw new Error("Open VELORA from its Telegram bot to connect a wallet.");
+      const ui = getTonConnectUI();
+      if (!ui) throw new Error("TON Connect could not load. Refresh and try again.");
+      if (ui.wallet) await ui.disconnect();
+      const network = import.meta.env.VITE_TON_NETWORK === "mainnet" ? "-239" : "-3";
+      ui.setConnectionNetwork(network);
+      ui.setConnectRequestParameters({ state: "loading" });
+      const challenge = await getWalletChallenge({ data: { initData } });
+      if (!challenge.ok) throw new Error(challenge.error);
+      processing.current = false;
+      unsubscribe.current?.();
+      unsubscribe.current = ui.onStatusChange(async (wallet) => {
+        if (!wallet || processing.current) return;
+        processing.current = true;
+        try {
+          const item = wallet.connectItems?.tonProof;
+          if (!item || !("proof" in item)) throw new Error("The wallet did not return a TON proof. Reconnect and approve the signature request.");
+          const verified = await verifyWallet({
+            data: {
+              initData,
+              address: wallet.account.address,
+              chain: wallet.account.chain,
+              publicKey: wallet.account.publicKey,
+              proof: item.proof,
+            },
+          });
+          if (!verified.ok) throw new Error(verified.error);
+          unsubscribe.current?.();
+          onConnected(verified.wallet);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Wallet verification failed.");
+          await ui.disconnect().catch(() => undefined);
+        } finally {
+          setBusy(false);
+        }
+      });
+      ui.setConnectRequestParameters({ state: "ready", value: { tonProof: challenge.payload } });
+      await ui.openModal();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Wallet connection failed.");
+      getTonConnectUI()?.setConnectRequestParameters(null);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      <GoldButton disabled={busy} onClick={connect}>{busy ? "Connecting…" : label}</GoldButton>
+      {error && <p role="alert" className="mt-2 text-xs leading-relaxed text-danger">{error}</p>}
+    </div>
+  );
+}
+
 function Sheets() {
   const { tr, tf } = useT();
   const { sheet, close, open, setScreen, sellAmount } = useNav();
@@ -1253,17 +1357,17 @@ function Sheets() {
     return (
       <Sheet title={tr("connectTitle")} onClose={close}>
         <p className="text-sm leading-relaxed text-muted">{tr("connectBody")}</p>
+        <p className="mt-3 text-xs leading-relaxed text-gold">{tr("walletProofNote")}</p>
         <p className="mt-3 text-sm font-bold">{fmtTrim(s.gram, 2)} GRAM</p>
         <div className="mt-4">
-          <GoldButton
-            onClick={() => {
-              s.connect();
+          <TonConnectAction
+            label={tr("connectBtn")}
+            onConnected={(address) => {
+              s.connect(address);
               if (!useVelora.getState().activated) open("activate");
               else close();
             }}
-          >
-            {tr("connectBtn")}
-          </GoldButton>
+          />
         </div>
       </Sheet>
     );
