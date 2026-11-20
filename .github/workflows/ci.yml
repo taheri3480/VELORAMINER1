@@ -35,7 +35,20 @@ jobs:
             git push origin HEAD:${GITHUB_REF_NAME}
           fi
       - run: npm ci
+      - name: Start dev server for auth invariant
+        run: |
+          npm run dev > /tmp/velora-dev.log 2>&1 &
+          echo $! > /tmp/velora-dev.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/__app-env >/tmp/velora-app-env.json; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/velora-dev.log
+          exit 1
       - run: npm run check:auth
+      - name: Stop dev server
+        if: always()
+        run: if [ -f /tmp/velora-dev.pid ]; then kill $(cat /tmp/velora-dev.pid) || true; fi
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
