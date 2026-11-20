@@ -1,0 +1,14 @@
+node_modules
+.output
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
