@@ -23,7 +23,7 @@
 5. `TG_BOT_TOKEN`، `TONAPI_KEY` و `ADMIN_TG_IDS` را در فایل `.env` خود سرور وارد کنید.
 6. فایل `public/tonconnect-manifest.json` را باز کنید و `url` و `iconUrl` را با دامنه HTTPS واقعی خود جایگزین کنید؛ دامنه manifest باید با `APP_DOMAIN` یکسان باشد.
 7. برای مرحله آزمایشی، `TON_NETWORK=testnet` و `VITE_TON_NETWORK=testnet` را یکسان نگه دارید. `TON_PROOF_ENABLED=false` بماند تا دامنه و کلید TonAPI آماده و بررسی شوند؛ سپس فقط برای آزمون کیف پول روی Testnet آن را `true` کنید.
-8. `HOT_WALLET_MNEMONIC` خالی بماند و هیچ پرداخت واقعی فعال نشود.
+8. `PAYOUTS_ENABLED=false` بماند و `HOT_WALLET_MNEMONIC` خالی باشد. کد پرداخت فقط با فعال‌سازی صریح `PAYOUTS_ENABLED=true` و انتخاب `TON_NETWORK=mainnet` اجازه اجرا می‌دهد؛ در Testnet پرداخت واقعی مسدود است.
 9. فایل `.env` را هرگز در GitHub یا چت بارگذاری نکنید.
 
 ## ۳) نصب و اجرای آزمایشی
@@ -109,4 +109,4 @@ npm run build
 | `APP_DOMAIN` | دامنه عمومی برای TON Proof |
 | `TON_PROOF_ENABLED` | فقط برای آزمون Testnet پس از تنظیم دامنه و کلید TonAPI فعال شود |
 | `TON_NETWORK` / `VITE_TON_NETWORK` | شبکه کیف پول سرور و مرورگر؛ هر دو باید یکسان باشند |
-| `HOT_WALLET_MNEMONIC` | عبارت کیف پول گرم محدود؛ فعلاً خالی بماند |
+| `PAYOUTS_ENABLED` | برای استقرار اولیه `false`؛ پرداخت فقط با تأیید صریح روی Mainnet |\n| `HOT_WALLET_MNEMONIC` | عبارت کیف پول گرم محدود؛ فعلاً خالی بماند |
