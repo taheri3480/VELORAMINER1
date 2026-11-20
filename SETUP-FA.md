@@ -107,5 +107,6 @@ npm run build
 | `MEMO_SECRET` | امضای memoهای واریز |
 | `ADMIN_TG_IDS` | شناسه‌های عددی مدیران |
 | `APP_DOMAIN` | دامنه عمومی برای TON Proof |
-| `TON_PROOF_ENABLED` | فقط برای آزمون Testnet پس از تنظیم دامنه و کلید TonAPI فعال شود |\n| `TON_NETWORK` / `VITE_TON_NETWORK` | شبکه کیف پول سرور و مرورگر؛ هر دو باید یکسان باشند |
+| `TON_PROOF_ENABLED` | فقط برای آزمون Testnet پس از تنظیم دامنه و کلید TonAPI فعال شود |
+| `TON_NETWORK` / `VITE_TON_NETWORK` | شبکه کیف پول سرور و مرورگر؛ هر دو باید یکسان باشند |
 | `HOT_WALLET_MNEMONIC` | عبارت کیف پول گرم محدود؛ فعلاً خالی بماند |
