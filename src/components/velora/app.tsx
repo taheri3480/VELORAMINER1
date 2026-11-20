@@ -1107,7 +1107,7 @@ function WalletScreen() {
             </p>
             <p className="mt-2 text-xs break-all text-muted">{s.address}</p>
             <p className="mt-2 text-sm font-bold">{fmtTrim(s.gram, 2)} GRAM</p>
-            <button type="button" onClick={async () => { try { await getTonConnectUI()?.disconnect(); } finally { s.disconnect(); } }} className="mt-3 inline-flex h-10 items-center gap-2 rounded-full border border-line px-3 text-sm font-bold">
+            <button type="button" onClick={async () => { if (s.withdrawals.some((w) => w.status === "pending")) { s.disconnect(); return; } try { await getTonConnectUI()?.disconnect(); } finally { s.disconnect(); } }} className="mt-3 inline-flex h-10 items-center gap-2 rounded-full border border-line px-3 text-sm font-bold">
               <Unlink size={14} />
               {tr("disconnect")}
             </button>
