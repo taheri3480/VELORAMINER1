@@ -20,7 +20,7 @@
    openssl rand -hex 32
    ```
 4. توکن ربات را از `@BotFather` بچرخانید؛ توکن قدیمی که قبلاً در آرشیو قدیمی بوده نباید دوباره استفاده شود.
-5. `TG_BOT_TOKEN`، `TONAPI_KEY` و `ADMIN_TG_IDS` را در فایل `.env` خود سرور وارد کنید.
+5. `TG_BOT_TOKEN`، `TONAPI_KEY` و `ADMIN_TG_IDS` را در فایل `.env` خود سرور وارد کنید. مقدار `ADMIN_TG_IDS` شناسه عددی تلگرام مدیر است؛ `MINI_APP_URL` را هم پس از آماده‌شدن دامنه HTTPS روی آدرس مینی‌اپ تنظیم کنید تا پیام درخواست برداشت دکمه ورود به پنل مدیریت داشته باشد.
 6. فایل `public/tonconnect-manifest.json` را باز کنید و `url` و `iconUrl` را با دامنه HTTPS واقعی خود جایگزین کنید؛ دامنه manifest باید با `APP_DOMAIN` یکسان باشد.
 7. برای مرحله آزمایشی، `TON_NETWORK=testnet` و `VITE_TON_NETWORK=testnet` را یکسان نگه دارید. `TON_PROOF_ENABLED=false` بماند تا دامنه و کلید TonAPI آماده و بررسی شوند؛ سپس فقط برای آزمون کیف پول روی Testnet آن را `true` کنید.
 8. `DEPOSITS_ENABLED=false` و `PAYOUTS_ENABLED=false` بمانند و `HOT_WALLET_MNEMONIC` خالی باشد. واریز و پرداخت واقعی فقط با فعال‌سازی صریح متغیر مربوط و انتخاب `TON_NETWORK=mainnet` اجازه اجرا می‌گیرند؛ در Testnet هر دو مسدودند.
@@ -106,6 +106,7 @@ npm run build
 | `TONAPI_KEY` | دسترسی به TonAPI |
 | `MEMO_SECRET` | امضای memoهای واریز |
 | `ADMIN_TG_IDS` | شناسه‌های عددی مدیران |
+| `MINI_APP_URL` | آدرس HTTPS مینی‌اپ برای دکمه پنل مدیر در اعلان تلگرام |
 | `APP_DOMAIN` | دامنه عمومی برای TON Proof |
 | `TON_PROOF_ENABLED` | فقط برای آزمون Testnet پس از تنظیم دامنه و کلید TonAPI فعال شود |
 | `TON_NETWORK` / `VITE_TON_NETWORK` | شبکه کیف پول سرور و مرورگر؛ هر دو باید یکسان باشند |
