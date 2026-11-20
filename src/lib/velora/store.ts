@@ -77,7 +77,7 @@ type Actions = {
   boot: () => void;
   settle: (now?: number) => void;
   setLang: (lang: Lang) => void;
-  connect: () => void;
+  connect: (verifiedAddress: string) => void;
   disconnect: () => void;
   activate: () => void;
   collect: () => void;
@@ -130,13 +130,6 @@ function uid(prefix: string): string {
   return `${prefix}${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
 }
 
-function makeAddress(): string {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-  let out = "UQ";
-  for (let i = 0; i < 46; i += 1) out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return out;
-}
-
 function genCode(): string {
   return String(Math.floor(1_000_000_000 + Math.random() * 9_000_000_000));
 }
@@ -161,6 +154,8 @@ export const useVelora = create<Store>()(
         const s = get();
         const patch: Partial<Data> = {};
         if (!s.lastTick) patch.lastTick = Date.now();
+        // A locally persisted preview flag is not proof of wallet ownership.
+        if (s.walletConnected || s.address) { patch.walletConnected = false; patch.address = ""; }
         if (!s.referralCode) patch.referralCode = genCode();
         if (Object.keys(patch).length) set(patch);
       },
@@ -202,14 +197,11 @@ export const useVelora = create<Store>()(
         if (paid) say(get, set, "toastPaid");
       },
       setLang: (lang) => set({ lang }),
-      connect: () => {
+      connect: (verifiedAddress) => {
         const s = get();
-        if (s.banned) {
-          say(get, set, "toastBanned");
-          return;
-        }
-        if (s.walletConnected) return;
-        set({ walletConnected: true, address: s.address || makeAddress() });
+        if (s.banned) { say(get, set, "toastBanned"); return; }
+        if (!verifiedAddress || verifiedAddress.length > 100) return;
+        set({ walletConnected: true, address: verifiedAddress });
         say(get, set, "toastConnected");
       },
       disconnect: () => {
@@ -219,7 +211,7 @@ export const useVelora = create<Store>()(
           return;
         }
         get().settle();
-        set({ walletConnected: false });
+        set({ walletConnected: false, address: "" });
         say(get, set, "toastOff");
       },
       activate: () => {
