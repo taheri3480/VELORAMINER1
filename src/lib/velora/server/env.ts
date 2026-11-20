@@ -42,3 +42,8 @@ export function readEnv(
   if (toRawAddress(VLR_JETTON_MASTER) === null) invalid.push("VLR_JETTON_MASTER");
   return missing.length || invalid.length ? { ok: false, missing, invalid } : { ok: true, env };
 }
+
+/** Real native-coin deposits are Mainnet-only and opt-in. */
+export function isDepositEnabled(source: Record<string, string | undefined> = process.env): boolean {
+  return source.DEPOSITS_ENABLED?.trim() === "true" && source.TON_NETWORK?.trim().toLowerCase() === "mainnet";
+}
