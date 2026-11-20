@@ -7,6 +7,7 @@ import type { IncomingTransfer } from "./deposits.ts";
 import type { Price } from "./buy-quote.ts";
 
 const BASE = "https://tonapi.io";
+const TESTNET_BASE = "https://testnet.tonapi.io";
 
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -60,8 +61,8 @@ type FetchFn = (
   init?: { method?: string; headers?: Record<string, string>; body?: string },
 ) => Promise<{ ok: boolean; status?: number; json(): Promise<unknown> }>;
 
-async function get(path: string, key: string, f: FetchFn): Promise<unknown> {
-  const r = await f(`${BASE}${path}`, { headers: { Authorization: `Bearer ${key}` } });
+async function get(path: string, key: string, f: FetchFn, base = BASE): Promise<unknown> {
+  const r = await f(`${base}${path}`, { headers: { Authorization: `Bearer ${key}` } });
   if (!r.ok) throw new Error("tonapi-request-failed");
   return r.json();
 }
@@ -86,8 +87,9 @@ export function parsePublicKey(json: unknown): string | null {
 /** Public key of a deployed wallet. Undeployed wallets have none -> null -> proof rejected. */
 export async function fetchPublicKey(
   key: string, addressRaw: string, f: FetchFn = fetch as unknown as FetchFn,
+  network: "mainnet" | "testnet" = "mainnet",
 ): Promise<string | null> {
-  return parsePublicKey(await get(`/v2/accounts/${addressRaw}/publickey`, key, f));
+  return parsePublicKey(await get(`/v2/accounts/${addressRaw}/publickey`, key, f, network === "testnet" ? TESTNET_BASE : BASE));
 }
 
 // ---- hot wallet / payout helpers (shapes from public TonAPI docs; verify once against live responses) ----
