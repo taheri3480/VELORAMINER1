@@ -92,7 +92,7 @@ describe("network-aware wallet lookup", () => {
     };
     await fetchPublicKey("key", WALLET, fakeFetch, "testnet");
     await fetchPublicKey("key", WALLET, fakeFetch, "mainnet");
-    assert.match(urls[0], /^https:\/\/testnet\\.tonapi\\.io\//);
-    assert.match(urls[1], /^https:\/\/tonapi\\.io\//);
+    assert.match(urls[0], /^https:\/\/testnet\.tonapi\.io\//);
+    assert.match(urls[1], /^https:\/\/tonapi\.io\//);
   });
 });
