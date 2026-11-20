@@ -79,6 +79,7 @@ import markUrl from "@/assets/velora-mark.png";
 import { useSession } from "@/lib/velora/session";
 import { signInWithTelegram } from "@/lib/velora/login-client";
 import { getWalletChallenge, verifyWallet } from "@/lib/velora/wallet";
+import { adminListWithdrawals, adminReviewWithdrawal, type WithdrawalRow } from "@/lib/velora/withdraw";
 
 
 type TonProofPayload = {
@@ -1449,7 +1450,7 @@ function Sheets() {
           <MenuTile icon={<Check size={18} />} title={tr("tasks")} body={tr("tasksHint")} onClick={() => setScreen("tasks")} />
           <MenuTile icon={<Trophy size={18} />} title={tr("leagues")} body={tr("leagueHint")} onClick={() => open("leagues")} />
           <MenuTile icon={<BookOpen size={18} />} title={tr("rules")} body={tr("rulesLead")} onClick={() => setScreen("rules")} />
-          {isAdmin && <MenuTile icon={<Shield size={18} />} title="Admin withdrawals" body="Review requests and check the on-chain 25% hold" onClick={() => setScreen("admin")} tone="gold" />}
+          {isAdmin && <MenuTile icon={<Shield size={18} />} title="Admin withdrawals" body="Review requests and check the on-chain 25% hold" onClick={() => setScreen("admin")} />}
         </div>
         <p className="mt-4 text-xs font-bold tracking-wide text-dim">{tr("preview")}</p>
         <div className="mt-2 grid gap-2">
