@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseIncomingTransfers, parseVlrPrice } from "./tonapi.ts";
+import { parseIncomingTransfers, parseVlrPrice, fetchPublicKey } from "./tonapi.ts";
 import { planDeposits } from "./ingest.ts";
 import { memoFor } from "./deposits.ts";
 import { toRawAddress } from "./ton-address.ts";
@@ -79,5 +79,20 @@ describe("jetton history", () => {
     ] }, W);
     assert.deepEqual(r.map((e) => [e.id, e.direction, e.amount, e.at]), [["e1:0", "in", 5000, 100000], ["e2:0", "out", 1000, 200000]]);
     assert.deepEqual(parseJettonHistory(null, W), []);
+  });
+});
+
+
+describe("network-aware wallet lookup", () => {
+  it("uses the selected TonAPI network", async () => {
+    const urls: string[] = [];
+    const fakeFetch = async (url: string) => {
+      urls.push(url);
+      return { ok: true, json: async () => ({ public_key: "ab".repeat(32) }) };
+    };
+    await fetchPublicKey("key", WALLET, fakeFetch, "testnet");
+    await fetchPublicKey("key", WALLET, fakeFetch, "mainnet");
+    assert.match(urls[0], /^https:\/\/testnet\\.tonapi\\.io\//);
+    assert.match(urls[1], /^https:\/\/tonapi\\.io\//);
   });
 });
